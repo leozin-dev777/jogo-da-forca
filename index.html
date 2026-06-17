@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jogo da Forca</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #0f172a; color: #f1f5f9; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; }
+  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; color: #7dd3fc; }
+  .sub { color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+  #tela-entrada, #tela-jogo { width: 100%; max-width: 480px; }
+
+  .card { background: #1e293b; border-radius: 16px; padding: 1.5rem; margin-bottom: 1rem; }
+
+  input[type=text] { width: 100%; padding: 0.75rem 1rem; border-radius: 10px; border: 1.5px solid #334155; background: #0f172a; color: #f1f5f9; font-size: 1rem; outline: none; margin-bottom: 0.75rem; }
+  input[type=text]:focus { border-color: #7dd3fc; }
+
+  button { width: 100%; padding: 0.75rem; border-radius: 10px; border: none; background: #3b82f6; color: white; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  button:hover { background: #2563eb; }
+  button:disabled { background: #334155; cursor: default; }
+
+  /* Forca SVG */
+  .forca-wrap { display: flex; justify-content: center; margin: 0.5rem 0 1rem; }
+  svg.forca { width: 160px; height: 160px; }
+
+  /* Palavra */
+  .palavra { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 1rem 0; }
+  .letra-box { width: 36px; height: 44px; border-bottom: 3px solid #7dd3fc; display: flex; align-items: flex-end; justify-content: center; font-size: 1.4rem; font-weight: 700; text-transform: uppercase; color: #f1f5f9; }
+  .letra-box.espaco { border-bottom-color: transparent; }
+
+  /* Teclado */
+  .teclado { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 1rem; }
+  .tecla { width: 40px; height: 40px; border-radius: 8px; border: none; background: #334155; color: #f1f5f9; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.15s; text-transform: uppercase; }
+  .tecla:hover:not(:disabled) { background: #475569; }
+  .tecla.acerto { background: #16a34a; color: white; }
+  .tecla.erro { background: #dc2626; color: white; }
+  .tecla:disabled { opacity: 0.45; cursor: default; }
+
+  /* Aviso */
+  #aviso { text-align: center; font-size: 0.95rem; color: #fbbf24; min-height: 1.4rem; margin: 0.5rem 0; }
+
+  /* Fim */
+  .fim-banner { text-align: center; padding: 1rem; border-radius: 12px; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .fim-banner.vitoria { background: #14532d; color: #4ade80; }
+  .fim-banner.derrota { background: #450a0a; color: #f87171; }
+
+  /* Placar */
+  .placar { display: flex; justify-content: space-between; font-size: 0.85rem; color: #94a3b8; }
+  .placar span { color: #7dd3fc; font-weight: 600; }
+
+  .papel-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .papel-badge.escolhedor { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed55; }
+  .papel-badge.adivinhador { background: #0369a122; color: #7dd3fc; border: 1px solid #0369a155; }
+
+  #rodada-info { text-align: center; font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem; }
+</style>
+</head>
+<body>
+
+<h1>🎯 Jogo da Forca</h1>
+<p class="sub">Multiplayer online</p>
+
+<!-- TELA DE ENTRADA -->
+<div id="tela-entrada">
+  <div class="card">
+    <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:0.75rem;">Cria ou entra numa sala com o mesmo código que a tua amiga.</p>
+    <input type="text" id="inp-sala" placeholder="Código da sala (ex: forca123)" maxlength="20" />
+    <input type="text" id="inp-nome" placeholder="O teu nome" maxlength="15" />
+    <button id="btn-entrar">Entrar na sala</button>
+    <p id="aviso-entrada" style="color:#f87171;font-size:0.85rem;margin-top:0.5rem;min-height:1.2rem;"></p>
+  </div>
+</div>
+
+<!-- TELA DE JOGO -->
+<div id="tela-jogo" style="display:none;">
+  <div class="card">
+    <div id="rodada-info">Rodada 1</div>
+    <div style="text-align:center">
+      <span id="papel-badge" class="papel-badge">—</span>
+    </div>
+
+    <!-- Forca -->
+    <div class="forca-wrap">
+      <svg class="forca" viewBox="0 0 160 160">
+        <!-- Estrutura sempre visível -->
+        <line x1="20" y1="150" x2="140" y2="150" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+        <line x1="50" y1="150" x2="50" y2="10" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+        <line x1="50" y1="10" x2="100" y2="10" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+        <line x1="100" y1="10" x2="100" y2="28" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+        <!-- Partes do corpo (ocultas inicialmente) -->
+        <circle id="p-cabeca" cx="100" cy="38" r="10" stroke="#f87171" stroke-width="3" fill="none" style="display:none"/>
+        <line id="p-corpo" x1="100" y1="48" x2="100" y2="90" stroke="#f87171" stroke-width="3" style="display:none"/>
+        <line id="p-braco-e" x1="100" y1="58" x2="78" y2="75" stroke="#f87171" stroke-width="3" style="display:none"/>
+        <line id="p-braco-d" x1="100" y1="58" x2="122" y2="75" stroke="#f87171" stroke-width="3" style="display:none"/>
+        <line id="p-perna-e" x1="100" y1="90" x2="80" y2="115" stroke="#f87171" stroke-width="3" style="display:none"/>
+        <line id="p-perna-d" x1="100" y1="90" x2="120" y2="115" stroke="#f87171" stroke-width="3" style="display:none"/>
+      </svg>
+    </div>
+
+    <!-- Palavra -->
+    <div class="palavra" id="palavra"></div>
+
+    <!-- Aviso -->
+    <div id="aviso">Conectando...</div>
+
+    <!-- Área do escolhedor -->
+    <div id="area-escolhedor" style="display:none;">
+      <input type="text" id="inp-palavra" placeholder="Digite a palavra secreta..." />
+      <button id="btn-enviar-palavra">Enviar palavra</button>
+    </div>
+
+    <!-- Teclado -->
+    <div id="area-teclado" style="display:none;">
+      <div class="teclado" id="teclado"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const letras = 'abcdefghijklmnopqrstuvwxyzáéíóúàâêôãõç';
+const partes = ['p-cabeca','p-corpo','p-braco-e','p-braco-d','p-perna-e','p-perna-d'];
+let ws, papel = null;
+
+// Teclado
+const teclado = document.getElementById('teclado');
+'abcdefghijklmnopqrstuvwxyz'.split('').forEach(l => {
+  const b = document.createElement('button');
+  b.className = 'tecla';
+  b.textContent = l;
+  b.dataset.letra = l;
+  b.onclick = () => {
+    ws.send(JSON.stringify({ type: 'letra', letra: l }));
+    b.disabled = true;
+  };
+  teclado.appendChild(b);
+});
+
+document.getElementById('btn-entrar').onclick = () => {
+  const sala = document.getElementById('inp-sala').value.trim();
+  const nome = document.getElementById('inp-nome').value.trim();
+  if (!sala) { document.getElementById('aviso-entrada').textContent = 'Escreve um código de sala.'; return; }
+  if (!nome) { document.getElementById('aviso-entrada').textContent = 'Escreve o teu nome.'; return; }
+  conectar(sala, nome);
+};
+
+document.getElementById('btn-enviar-palavra').onclick = () => {
+  const p = document.getElementById('inp-palavra').value.trim();
+  if (!p) return;
+  ws.send(JSON.stringify({ type: 'palavra', palavra: p }));
+  document.getElementById('inp-palavra').value = '';
+  document.getElementById('area-escolhedor').style.display = 'none';
+};
+
+function conectar(sala, nome) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}`);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'entrar', sala, nome }));
+    document.getElementById('tela-entrada').style.display = 'none';
+    document.getElementById('tela-jogo').style.display = 'block';
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === 'info') {
+      // nada extra
+    }
+
+    if (msg.type === 'aviso') {
+      document.getElementById('aviso').textContent = msg.msg;
+    }
+
+    if (msg.type === 'erro') {
+      document.getElementById('aviso-entrada').textContent = msg.msg;
+      document.getElementById('tela-entrada').style.display = 'block';
+      document.getElementById('tela-jogo').style.display = 'none';
+    }
+
+    if (msg.type === 'estado') {
+      papel = msg.papel;
+      atualizarEstado(msg);
+    }
+
+    if (msg.type === 'fim') {
+      const venceu = (msg.resultado === 'adivinhador_venceu' && papel === 'adivinhador') ||
+                     (msg.resultado === 'escolhedor_venceu' && papel === 'escolhedor');
+      const aviso = document.getElementById('aviso');
+      aviso.innerHTML = venceu
+        ? `🎉 Ganhastes! A palavra era: <b>${msg.palavra}</b>`
+        : `😢 Perdestes! A palavra era: <b>${msg.palavra}</b>`;
+      document.getElementById('area-teclado').style.display = 'none';
+      document.getElementById('area-escolhedor').style.display = 'none';
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('aviso').textContent = '⚠️ Ligação perdida. Recarrega a página.';
+  };
+}
+
+function atualizarEstado(s) {
+  // Rodada
+  document.getElementById('rodada-info').textContent = `Rodada ${s.rodada}`;
+
+  // Badge papel
+  const badge = document.getElementById('papel-badge');
+  if (s.papel === 'escolhedor') {
+    badge.textContent = '🔤 Tu escolhes a palavra';
+    badge.className = 'papel-badge escolhedor';
+  } else {
+    badge.textContent = '🔍 Tu advinhas a palavra';
+    badge.className = 'papel-badge adivinhador';
+  }
+
+  // Forca
+  partes.forEach((id, i) => {
+    document.getElementById(id).style.display = i < s.erros ? 'block' : 'none';
+  });
+
+  // Palavra
+  const palavraDiv = document.getElementById('palavra');
+  palavraDiv.innerHTML = '';
+  s.revelada.forEach(l => {
+    const box = document.createElement('div');
+    box.className = l === ' ' ? 'letra-box espaco' : 'letra-box';
+    box.textContent = l !== '_' ? l : '';
+    palavraDiv.appendChild(box);
+  });
+
+  // Teclado - atualizar estado das teclas
+  document.querySelectorAll('.tecla').forEach(b => {
+    const l = b.dataset.letra;
+    if (s.letrasUsadas.includes(l)) {
+      const napalavra = s.revelada.map(x => x.toLowerCase()).includes(l);
+      b.disabled = true;
+      b.className = 'tecla ' + (napalavra ? 'acerto' : 'erro');
+    } else {
+      b.disabled = false;
+      b.className = 'tecla';
+    }
+  });
+
+  // Mostrar/esconder áreas
+  if (s.fase === 'escolhendo' && s.papel === 'escolhedor') {
+    document.getElementById('area-escolhedor').style.display = 'block';
+    document.getElementById('area-teclado').style.display = 'none';
+  } else if (s.fase === 'jogando' && s.papel === 'adivinhador') {
+    document.getElementById('area-escolhedor').style.display = 'none';
+    document.getElementById('area-teclado').style.display = 'block';
+  } else {
+    document.getElementById('area-escolhedor').style.display = 'none';
+    document.getElementById('area-teclado').style.display = 'none';
+  }
+}
+</script>
+</body>
+</html>
